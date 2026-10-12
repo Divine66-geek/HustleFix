@@ -9,6 +9,7 @@ import com.example.hustlefix.Rating
 import com.example.hustlefix.Service
 import com.example.hustlefix.data.JobRepository
 import com.example.hustlefix.data.RatingRepository
+import com.example.hustlefix.util.ActivityLogger
 import com.google.firebase.database.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,23 @@ class BookingDetailViewModel(
     private var bookingRef: DatabaseReference? = null
     private var bookingListener: ValueEventListener? = null
 
+    private fun parseFirebaseDouble(value: Any?): Double {
+        return when (value) {
+            is Double -> value
+            is Long -> value.toDouble()
+            is Int -> value.toDouble()
+            is Float -> value.toDouble()
+            is Number -> value.toDouble()
+            is String -> value.toDoubleOrNull() ?: 0.0
+            is Map<*, *> -> 0.0
+            else -> 0.0
+        }
+    }
+
+    private fun MutableData.safeDouble(): Double {
+        return parseFirebaseDouble(this.value)
+    }
+
     fun loadBooking(bookingId: String) {
         if (bookingId.isEmpty()) return
         _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -51,7 +69,8 @@ class BookingDetailViewModel(
         val uid = auth.currentUser?.uid
         if (uid != null) {
             database.getReference("users").child(uid).child("walletBalance").get().addOnSuccessListener {
-                _uiState.value = _uiState.value.copy(walletBalance = it.getValue(Double::class.java) ?: 0.0)
+                val bal = it.getValue(Double::class.java) ?: it.getValue(Long::class.java)?.toDouble() ?: 0.0
+                _uiState.value = _uiState.value.copy(walletBalance = bal)
             }
         }
 
@@ -70,6 +89,8 @@ class BookingDetailViewModel(
                         val currentUserId = auth.currentUser?.uid
                         val isProvider = currentUserId != null && currentUserId == booking.workerId
                         
+                        checkAndCreditWorkerIfNeeded(booking)
+
                         _uiState.value = _uiState.value.copy(
                             booking = booking,
                             isServiceProvider = isProvider,
@@ -125,6 +146,38 @@ class BookingDetailViewModel(
             }
             override fun onCancelled(error: DatabaseError) {}
         })
+    }
+
+    private fun checkAndCreditWorkerIfNeeded(booking: Booking) {
+        val currentUserId = auth.currentUser?.uid
+        val workerId = booking.workerId ?: booking.getServiceProviderId()
+        
+        if (booking.paymentStatus == "PAID" && booking.getFeeCredited() != true && currentUserId != null && currentUserId == workerId) {
+            val amount = booking.amount ?: 0.0
+            if (amount > 0.0) {
+                viewModelScope.launch {
+                    try {
+                        val workerRef = database.getReference("users").child(workerId).child("walletBalance")
+                        val snap = workerRef.get().await()
+                        val curr = parseFirebaseDouble(snap.value)
+                        workerRef.setValue(curr + amount).await()
+
+                        val workerTref = database.getReference("transactions").child(workerId).push()
+                        workerTref.setValue(mapOf(
+                            "id" to workerTref.key,
+                            "type" to "Booking Fee Received",
+                            "amount" to amount,
+                            "details" to "Received booking fee for ${booking.serviceTitle ?: "Service"}",
+                            "timestamp" to System.currentTimeMillis()
+                        )).await()
+
+                        database.getReference("bookings").child(booking.bookingId).child("feeCredited").setValue(true).await()
+                    } catch (e: Exception) {
+                        Log.e("HustleFix", "Error crediting worker: ${e.message}")
+                    }
+                }
+            }
+        }
     }
 
     fun submitQuoteForBooking(amount: Double, message: String) {
@@ -219,14 +272,7 @@ class BookingDetailViewModel(
                 )).await()
 
                 // 4. Update Admin Wallet
-                database.getReference("admin_wallet").child("balance").runTransaction(object : Transaction.Handler {
-                    override fun doTransaction(currentData: MutableData): Transaction.Result {
-                        val currentBalance = currentData.getValue(Double::class.java) ?: 0.0
-                        currentData.value = currentBalance + platformFee
-                        return Transaction.success(currentData)
-                    }
-                    override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {}
-                })
+                database.getReference("admin_wallet").child("balance").setValue(ServerValue.increment(platformFee)).await()
 
                 // 5. Update Quote Payment Status and generate new completion code inside booking
                 val newCode = String.format(Locale.getDefault(), "%04d", (Math.random() * 9000).toInt() + 1000)
@@ -265,11 +311,7 @@ class BookingDetailViewModel(
         
         viewModelScope.launch {
             try {
-                val platformFeeRate = 0.10 // 10% Commission
-                val platformFee = amount * platformFeeRate
-                val workerEarnings = amount - platformFee
-
-                // 1. Deduct full amount from client wallet
+                // 1. Deduct amount from client wallet
                 val userRef = database.getReference("users").child(uid)
                 val newBalance = _uiState.value.walletBalance - amount
                 userRef.child("walletBalance").setValue(newBalance).await()
@@ -278,41 +320,20 @@ class BookingDetailViewModel(
                 val tRef = database.getReference("transactions").child(uid).push()
                 tRef.setValue(mapOf(
                     "id" to tRef.key,
-                    "type" to "Booking Payment",
+                    "type" to "Booking Fee Payment",
                     "amount" to -amount,
                     "timestamp" to System.currentTimeMillis()
                 )).await()
 
-                // 3. Move Commission to Admin Revenue Node
-                val revenueRef = database.getReference("admin_revenue").push()
-                revenueRef.setValue(mapOf(
-                    "bookingId" to booking.bookingId,
-                    "totalAmount" to amount,
-                    "commission" to platformFee,
-                    "timestamp" to System.currentTimeMillis()
-                )).await()
-
-                // 4. Update Admin Global Wallet Balance
-                database.getReference("admin_wallet").child("balance").runTransaction(object : Transaction.Handler {
-                    override fun doTransaction(currentData: MutableData): Transaction.Result {
-                        val currentBalance = currentData.getValue(Double::class.java) ?: 0.0
-                        currentData.value = currentBalance + platformFee
-                        return Transaction.success(currentData)
-                    }
-                    override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {}
-                })
-
-                // 5. Update Booking with payout details
+                // 3. Update Booking payment status to PAID
                 database.getReference("bookings").child(booking.bookingId).updateChildren(mapOf(
                     "paymentStatus" to "PAID",
                     "paidAt" to System.currentTimeMillis(),
-                    "paymentMethod" to "wallet",
-                    "platformFee" to platformFee,
-                    "workerEarnings" to workerEarnings
+                    "paymentMethod" to "wallet"
                 )).await()
 
                 // Log Activity
-                com.example.hustlefix.util.ActivityLogger.log(uid, "System", "PAYMENT_PROCESSED", "R$amount paid for booking ${booking.bookingId}")
+                ActivityLogger.log(uid, "System", "BOOKING_FEE_PAID", "R$amount booking fee paid for ${booking.bookingId}")
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -349,14 +370,7 @@ class BookingDetailViewModel(
                     if (clientId != null && amount > 0) {
                         // Refund to Client Wallet
                         database.getReference("users").child(clientId).child("walletBalance")
-                            .runTransaction(object : Transaction.Handler {
-                                override fun doTransaction(currentData: MutableData): Transaction.Result {
-                                    val current = currentData.getValue(Double::class.java) ?: 0.0
-                                    currentData.value = current + amount
-                                    return Transaction.success(currentData)
-                                }
-                                override fun onComplete(e: DatabaseError?, b: Boolean, s: DataSnapshot?) {}
-                            })
+                            .setValue(ServerValue.increment(amount)).await()
                         
                         // Log Refund Transaction
                         val refundRef = database.getReference("transactions").child(clientId).push()
@@ -372,15 +386,8 @@ class BookingDetailViewModel(
                         database.getReference("bookings").child(booking.bookingId).child("paymentStatus").setValue("REFUNDED")
                         
                         // Deduct from Admin Wallet (if 10% was already moved, we take the whole amount back)
-                        database.getReference("admin_wallet").child("balance").runTransaction(object : Transaction.Handler {
-                            override fun doTransaction(currentData: MutableData): Transaction.Result {
-                                val current = currentData.getValue(Double::class.java) ?: 0.0
-                                val fee = amount * 0.10
-                                currentData.value = current - fee
-                                return Transaction.success(currentData)
-                            }
-                            override fun onComplete(e: DatabaseError?, b: Boolean, s: DataSnapshot?) {}
-                        })
+                        database.getReference("admin_wallet").child("balance")
+                            .setValue(ServerValue.increment(-(amount * 0.10))).await()
                     }
                 }
 
@@ -397,14 +404,7 @@ class BookingDetailViewModel(
 
                         // Credit worker wallet
                         database.getReference("users").child(workerId).child("walletBalance")
-                            .runTransaction(object : Transaction.Handler {
-                                override fun doTransaction(currentData: MutableData): Transaction.Result {
-                                    val current = currentData.getValue(Double::class.java) ?: 0.0
-                                    currentData.value = current + workerEarnings
-                                    return Transaction.success(currentData)
-                                }
-                                override fun onComplete(e: DatabaseError?, b: Boolean, s: DataSnapshot?) {}
-                            })
+                            .setValue(ServerValue.increment(workerEarnings)).await()
 
                         // Log Worker Payout Transaction
                         val payoutRef = database.getReference("transactions").child(workerId).push()

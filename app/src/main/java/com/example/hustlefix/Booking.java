@@ -23,6 +23,7 @@ public class Booking {
     private Long paidAt;
     private String paymentMethod;
     private Double rating;
+    private Boolean feeCredited;
 
     public Booking() {
         // Default constructor for Firebase
@@ -84,6 +85,8 @@ public class Booking {
     public void setInstructions(String instructions) { this.instructions = instructions; }
     public void setCompletionCode(String code) { this.completionCode = code; }
     public void setRating(Double rating) { this.rating = rating; }
+    public Boolean getFeeCredited() { return feeCredited != null ? feeCredited : false; }
+    public void setFeeCredited(Boolean feeCredited) { this.feeCredited = feeCredited; }
 
     @Exclude
     public Double getPrice() { return getAmount(); }

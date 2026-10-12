@@ -36,8 +36,8 @@ class IncomeStatementViewModel : ViewModel() {
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val list = snapshot.children.mapNotNull { it.getValue(Transaction::class.java) }
-                    val income = list.sumOf { it.amount }
-                    val fees = 0.0 // Free platform for now
+                    val income = list.filter { it.amount > 0 }.sumOf { it.amount }
+                    val fees = income * 0.10 // 10% Platform Commission
                     
                     _uiState.value = _uiState.value.copy(
                         transactions = list.sortedByDescending { it.timestamp },

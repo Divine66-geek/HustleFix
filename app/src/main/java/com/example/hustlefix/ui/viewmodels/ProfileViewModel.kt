@@ -69,7 +69,7 @@ class ProfileViewModel : ViewModel() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val phone = snapshot.child("phone").getValue(String::class.java) ?: ""
                 val loc = snapshot.child("location").getValue(String::class.java) ?: ""
-                val balance = snapshot.child("walletBalance").getValue(Double::class.java) ?: 0.0
+                val balance = snapshot.child("walletBalance").getValue(Double::class.java) ?: snapshot.child("walletBalance").getValue(Long::class.java)?.toDouble() ?: 0.0
                 val dbPhotoUrl = snapshot.child("profileImage").getValue(String::class.java)
                 val role = snapshot.child("role").getValue(String::class.java) ?: "client"
                 

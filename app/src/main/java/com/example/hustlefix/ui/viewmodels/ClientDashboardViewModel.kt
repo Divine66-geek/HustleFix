@@ -43,6 +43,18 @@ class ClientDashboardViewModel : ViewModel() {
         loadData()
     }
 
+    private fun parseFirebaseDouble(value: Any?): Double {
+        return when (value) {
+            is Double -> value
+            is Long -> value.toDouble()
+            is Int -> value.toDouble()
+            is Float -> value.toDouble()
+            is Number -> value.toDouble()
+            is String -> value.toDoubleOrNull() ?: 0.0
+            else -> 0.0
+        }
+    }
+
     private fun loadData() {
         val uid = currentUserId ?: return
         _uiState.value = _uiState.value.copy(isLoading = true)
@@ -58,7 +70,7 @@ class ClientDashboardViewModel : ViewModel() {
         // Load wallet balance from users/{uid}/walletBalance
         database.getReference("users").child(uid).child("walletBalance").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val balance = snapshot.getValue(Double::class.java) ?: 0.0
+                val balance = parseFirebaseDouble(snapshot.value)
                 _uiState.value = _uiState.value.copy(walletBalance = "R${String.format(java.util.Locale.getDefault(), "%.2f", balance)}")
             }
             override fun onCancelled(error: DatabaseError) {}

@@ -39,6 +39,18 @@ class WalletViewModel : ViewModel() {
         loadData()
     }
 
+    private fun parseFirebaseDouble(value: Any?): Double {
+        return when (value) {
+            is Double -> value
+            is Long -> value.toDouble()
+            is Int -> value.toDouble()
+            is Float -> value.toDouble()
+            is Number -> value.toDouble()
+            is String -> value.toDoubleOrNull() ?: 0.0
+            else -> 0.0
+        }
+    }
+
     private fun loadData() {
         val uid = userId ?: return
         _uiState.value = _uiState.value.copy(isLoading = true)
@@ -48,7 +60,7 @@ class WalletViewModel : ViewModel() {
         balanceRef = database.getReference("users").child(uid).child("walletBalance")
         balanceListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val balance = snapshot.getValue(Double::class.java) ?: 0.0
+                val balance = parseFirebaseDouble(snapshot.value)
                 _uiState.value = _uiState.value.copy(
                     balance = String.format(Locale.getDefault(), "R%.2f", balance),
                     balanceValue = balance

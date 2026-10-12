@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class ServiceProviderDashboardUiState(
     val businessName: String = "",
@@ -39,6 +40,18 @@ class ServiceProviderDashboardViewModel : ViewModel() {
         loadData()
     }
 
+    private fun parseFirebaseDouble(value: Any?): Double {
+        return when (value) {
+            is Double -> value
+            is Long -> value.toDouble()
+            is Int -> value.toDouble()
+            is Float -> value.toDouble()
+            is Number -> value.toDouble()
+            is String -> value.toDoubleOrNull() ?: 0.0
+            else -> 0.0
+        }
+    }
+
     private fun loadData() {
         val uid = currentUserId ?: return
         
@@ -47,6 +60,17 @@ class ServiceProviderDashboardViewModel : ViewModel() {
             val name = snapshot.getValue(String::class.java) ?: auth.currentUser?.displayName ?: "Provider"
             _uiState.value = _uiState.value.copy(businessName = name)
         }
+
+        // Load wallet balance as total earnings
+        database.getReference("users").child(uid).child("walletBalance").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val balance = parseFirebaseDouble(snapshot.value)
+                _uiState.value = _uiState.value.copy(
+                    totalEarnings = "R${String.format(Locale.getDefault(), "%.2f", balance)}"
+                )
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
 
         loadStats()
         loadBookings()

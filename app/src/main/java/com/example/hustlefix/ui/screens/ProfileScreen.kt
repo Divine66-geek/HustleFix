@@ -71,6 +71,18 @@ fun ProfileScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showDisputeDialog by remember { mutableStateOf(false) }
     var disputeReason by remember { mutableStateOf("") }
+    var submitAttempted by remember { mutableStateOf(false) }
+    var disputeSubmitAttempted by remember { mutableStateOf(false) }
+    var experienceInput by remember(experience) { mutableStateOf(experience.toString()) }
+    val nameInvalid = name.isBlank()
+    val phoneInvalid = phone.isNotBlank() && (phone.length < 10 || !phone.all(Char::isDigit))
+    val skillInvalid = role == "worker" && skill.isBlank()
+    val categoryInvalid = role == "worker" && category.isBlank()
+    val experienceValue = experienceInput.toIntOrNull()
+    val experienceInvalid = role == "worker" && (
+            (submitAttempted && experienceInput.isBlank()) ||
+                    (experienceInput.isNotEmpty() && (experienceValue == null || experienceValue < 0))
+            )
     
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -93,7 +105,7 @@ fun ProfileScreen(
 
     if (showDisputeDialog) {
         AlertDialog(
-            onDismissRequest = { showDisputeDialog = false },
+            onDismissRequest = { showDisputeDialog = false; disputeSubmitAttempted = false },
             title = { Text("Dispute Investigation") },
             text = {
                 Column {
@@ -104,23 +116,26 @@ fun ProfileScreen(
                         onValueChange = { disputeReason = it },
                         label = { Text("Your Explanation") },
                         modifier = Modifier.fillMaxWidth().height(120.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        isError = disputeSubmitAttempted && disputeReason.isBlank()
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = { 
-                        onSubmitDispute(disputeReason)
-                        showDisputeDialog = false 
+                        disputeSubmitAttempted = true
+                        if (disputeReason.isNotBlank()) {
+                            onSubmitDispute(disputeReason)
+                            showDisputeDialog = false
+                        }
                     },
-                    enabled = disputeReason.isNotBlank()
                 ) {
                     Text("SUBMIT DISPUTE")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDisputeDialog = false }) { Text("CANCEL") }
+                TextButton(onClick = { showDisputeDialog = false; disputeSubmitAttempted = false }) { Text("CANCEL") }
             }
         )
     }
@@ -303,7 +318,8 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    singleLine = true
+                    singleLine = true,
+                    isError = (submitAttempted && nameInvalid)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -328,7 +344,11 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                    singleLine = true
+                    singleLine = true,
+                    isError = phoneInvalid,
+                    supportingText = {
+                        if (phoneInvalid) Text("Enter a valid phone number", color = MaterialTheme.colorScheme.error)
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -353,7 +373,8 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         leadingIcon = { Icon(Icons.Default.Engineering, contentDescription = null) },
-                        singleLine = true
+                        singleLine = true,
+                        isError = submitAttempted && skillInvalid
                     )
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -364,19 +385,27 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
-                        singleLine = true
+                        singleLine = true,
+                        isError = submitAttempted && categoryInvalid
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
-                        value = experience.toString(),
-                        onValueChange = { val exp = it.toIntOrNull() ?: 0; onExperienceChange(exp) },
+                        value = experienceInput,
+                        onValueChange = {
+                            experienceInput = it
+                            it.toIntOrNull()?.let(onExperienceChange)
+                        },
                         label = { Text("Years of Experience") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         leadingIcon = { Icon(Icons.Default.Timeline, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
+                        singleLine = true,
+                        isError = experienceInvalid,
+                        supportingText = {
+                            if (experienceInvalid) Text("Experience cannot be negative", color = MaterialTheme.colorScheme.error)
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -393,7 +422,10 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(40.dp))
 
                 Button(
-                    onClick = onSaveClick,
+                    onClick = {
+                        submitAttempted = true
+                        if (!nameInvalid && !phoneInvalid && !skillInvalid && !categoryInvalid && !experienceInvalid) onSaveClick()
+                    },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
                     enabled = !isLoading

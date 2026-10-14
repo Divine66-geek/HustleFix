@@ -28,6 +28,7 @@ fun ReportUserScreen(
     var description by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var isSuccess by remember { mutableStateOf(false) }
+    var submitAttempted by remember { mutableStateOf(false) }
     
     val reasons = listOf("Inappropriate behavior", "Fraud/Scam", "Poor service quality", "Late/No show", "Payment issues", "Other")
     var expanded by remember { mutableStateOf(false) }
@@ -79,6 +80,7 @@ fun ReportUserScreen(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Reason for reporting") },
+                        isError = submitAttempted && reason !in reasons,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp)
@@ -107,13 +109,16 @@ fun ReportUserScreen(
                     label = { Text("Describe what happened") },
                     modifier = Modifier.fillMaxWidth().height(150.dp),
                     shape = RoundedCornerShape(16.dp),
-                    maxLines = 10
+                    maxLines = 10,
+                    isError = submitAttempted && description.isBlank()
                 )
 
                 Spacer(modifier = Modifier.height(40.dp))
 
                 Button(
-                    onClick = { 
+                    onClick = {
+                        submitAttempted = true
+                        if (reason !in reasons || description.isBlank()) return@Button
                         isLoading = true
                         val reporterId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
                         val ref = FirebaseDatabase.getInstance().getReference("reports")
@@ -135,7 +140,7 @@ fun ReportUserScreen(
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = !isLoading && description.isNotEmpty()
+                    enabled = !isLoading
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)

@@ -233,6 +233,9 @@ fun TransactionItem(transaction: Transaction) {
 @Composable
 fun TopUpDialog(onDismiss: () -> Unit, onConfirm: (Double) -> Unit) {
     var amount by remember { mutableStateOf("") }
+    var submitAttempted by remember { mutableStateOf(false) }
+    val amountValue = amount.toDoubleOrNull()
+    val amountInvalid = amountValue == null || !amountValue.isFinite() || amountValue <= 0.0
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -248,14 +251,22 @@ fun TopUpDialog(onDismiss: () -> Unit, onConfirm: (Double) -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    isError = (amount.isNotEmpty() && amountInvalid) || (submitAttempted && amountInvalid),
+                    supportingText = {
+                        if ((amount.isNotEmpty() && amountInvalid) || (submitAttempted && amountInvalid)) {
+                            Text("Enter an amount greater than zero", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 )
             }
         },
         confirmButton = {
             Button(
-                onClick = { amount.toDoubleOrNull()?.let { onConfirm(it) } },
-                enabled = amount.isNotEmpty()
+                onClick = {
+                    submitAttempted = true
+                    if (!amountInvalid) onConfirm(amountValue!!)
+                }
             ) {
                 Text("TOP UP NOW")
             }

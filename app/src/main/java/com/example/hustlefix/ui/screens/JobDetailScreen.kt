@@ -32,6 +32,10 @@ fun JobDetailScreen(
     var quoteAmount by remember { mutableStateOf("") }
     var quoteMessage by remember { mutableStateOf("") }
     var showQuoteSheet by remember { mutableStateOf(false) }
+    var submitAttempted by remember { mutableStateOf(false) }
+    val quoteAmountValue = quoteAmount.toDoubleOrNull()
+    val quoteAmountInvalid = quoteAmountValue == null || !quoteAmountValue.isFinite() || quoteAmountValue <= 0.0
+    val quoteMessageInvalid = quoteMessage.isBlank()
 
     LaunchedEffect(job) {
         if (job != null && quoteAmount.isEmpty()) {
@@ -54,7 +58,7 @@ fun JobDetailScreen(
             if (job != null && job.status == "open") {
                 Surface(tonalElevation = 8.dp, modifier = Modifier.fillMaxWidth()) {
                     Button(
-                        onClick = { showQuoteSheet = true },
+                        onClick = { showQuoteSheet = true; submitAttempted = false },
                         modifier = Modifier.padding(16.dp).fillMaxWidth().height(56.dp),
                         shape = RoundedCornerShape(16.dp)
                     ) {
@@ -155,7 +159,13 @@ fun JobDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     shape = RoundedCornerShape(16.dp),
-                    prefix = { Text("R ") }
+                    prefix = { Text("R ") },
+                    isError = (quoteAmount.isNotEmpty() && quoteAmountInvalid) || (submitAttempted && quoteAmountInvalid),
+                    supportingText = {
+                        if ((quoteAmount.isNotEmpty() && quoteAmountInvalid) || (submitAttempted && quoteAmountInvalid)) {
+                            Text("Enter a quote greater than zero", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -189,19 +199,23 @@ fun JobDetailScreen(
                     label = { Text("Message to Client") },
                     placeholder = { Text("Explain why you are the best for this job...") },
                     modifier = Modifier.fillMaxWidth().height(120.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    isError = submitAttempted && quoteMessageInvalid
                 )
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
                 Button(
-                    onClick = { 
-                        onQuoteSubmit(quoteAmount.toDoubleOrNull() ?: 0.0, quoteMessage)
-                        showQuoteSheet = false
+                    onClick = {
+                        submitAttempted = true
+                        if (!quoteAmountInvalid && !quoteMessageInvalid) {
+                            onQuoteSubmit(quoteAmountValue!!, quoteMessage)
+                            showQuoteSheet = false
+                        }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = !isLoading && quoteAmount.isNotEmpty()
+                    enabled = !isLoading
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)

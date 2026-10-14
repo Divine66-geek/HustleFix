@@ -1,5 +1,6 @@
 package com.example.hustlefix.ui.screens
 
+import android.util.Patterns
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -47,6 +48,11 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     var resetEmail by remember { mutableStateOf("") }
+    var submitAttempted by remember { mutableStateOf(false) }
+    var resetSubmitAttempted by remember { mutableStateOf(false) }
+    val emailInvalid = email.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val resetEmailInvalid = resetEmail.isBlank() || !Patterns.EMAIL_ADDRESS.matcher(resetEmail).matches()
+    val passwordInvalid = password.isBlank()
 
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -68,7 +74,7 @@ fun LoginScreen(
     
     if (showResetDialog) {
         AlertDialog(
-            onDismissRequest = { showResetDialog = false },
+            onDismissRequest = { showResetDialog = false; resetSubmitAttempted = false },
             title = { Text("Reset Password") },
             text = {
                 Column {
@@ -79,20 +85,29 @@ fun LoginScreen(
                         onValueChange = { resetEmail = it },
                         label = { Text("Email") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        isError = resetSubmitAttempted && resetEmailInvalid,
+                        supportingText = {
+                            if (resetSubmitAttempted && resetEmailInvalid) {
+                                Text(if (resetEmail.isBlank()) "Email is required" else "Invalid email format", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     )
                 }
             },
             confirmButton = {
-                Button(onClick = { 
-                    onResetPassword(resetEmail)
-                    showResetDialog = false 
+                Button(onClick = {
+                    resetSubmitAttempted = true
+                    if (!resetEmailInvalid) {
+                        onResetPassword(resetEmail)
+                        showResetDialog = false
+                    }
                 }) {
                     Text("SEND")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("CANCEL") }
+                TextButton(onClick = { showResetDialog = false; resetSubmitAttempted = false }) { Text("CANCEL") }
             }
         )
     }
@@ -147,9 +162,18 @@ fun LoginScreen(
                     shape = RoundedCornerShape(20.dp),
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    isError = submitAttempted && emailInvalid,
+                    supportingText = {
+                        if (submitAttempted && emailInvalid) {
+                            Text(if (email.isBlank()) "Email is required" else "Invalid email format", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        errorBorderColor = MaterialTheme.colorScheme.error,
+                        errorLabelColor = MaterialTheme.colorScheme.error,
+                        errorLeadingIconColor = MaterialTheme.colorScheme.error
                     )
                 )
 
@@ -170,14 +194,21 @@ fun LoginScreen(
                     },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError = submitAttempted && passwordInvalid,
+                    supportingText = {
+                        if (submitAttempted && passwordInvalid) Text("Password is required", color = MaterialTheme.colorScheme.error)
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        errorBorderColor = MaterialTheme.colorScheme.error,
+                        errorLabelColor = MaterialTheme.colorScheme.error,
+                        errorLeadingIconColor = MaterialTheme.colorScheme.error
                     )
                 )
 
                 TextButton(
-                    onClick = { showResetDialog = true },
+                    onClick = { showResetDialog = true; resetSubmitAttempted = false },
                     modifier = Modifier.align(Alignment.End)
                 ) {
                     Text(
@@ -193,7 +224,8 @@ fun LoginScreen(
                 Button(
                     onClick = { 
                         com.example.hustlefix.util.SoundHelper.playClick(context)
-                        onLoginClick(email, password) 
+                        submitAttempted = true
+                        if (!emailInvalid && !passwordInvalid) onLoginClick(email, password)
                     },
                     modifier = Modifier
                         .fillMaxWidth()

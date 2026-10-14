@@ -30,6 +30,14 @@ fun WithdrawalRequestScreen(
     var accountHolder by remember { mutableStateOf("") }
     var accountNumber by remember { mutableStateOf("") }
     var branchCode by remember { mutableStateOf("") }
+    var submitAttempted by remember { mutableStateOf(false) }
+    val amountValue = amount.toDoubleOrNull()
+    val amountInvalid = amountValue == null || !amountValue.isFinite() || amountValue <= 0.0
+    val bankInvalid = bankName.isBlank()
+    val holderInvalid = accountHolder.isBlank()
+    val accountInvalid = accountNumber.isBlank() || !accountNumber.all(Char::isDigit)
+    val branchInvalid = branchCode.isBlank() || !branchCode.all(Char::isDigit)
+    val formValid = !amountInvalid && !bankInvalid && !holderInvalid && !accountInvalid && !branchInvalid
     
     val scrollState = rememberScrollState()
 
@@ -75,7 +83,13 @@ fun WithdrawalRequestScreen(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 shape = RoundedCornerShape(16.dp),
-                prefix = { Text("R ") }
+                prefix = { Text("R ") },
+                isError = (amount.isNotEmpty() && amountInvalid) || (submitAttempted && amountInvalid),
+                supportingText = {
+                    if ((amount.isNotEmpty() && amountInvalid) || (submitAttempted && amountInvalid)) {
+                        Text("Enter an amount greater than zero", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -85,7 +99,8 @@ fun WithdrawalRequestScreen(
                 onValueChange = { bankName = it },
                 label = { Text("Bank Name") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                isError = submitAttempted && bankInvalid
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -95,7 +110,8 @@ fun WithdrawalRequestScreen(
                 onValueChange = { accountHolder = it },
                 label = { Text("Account Holder Name") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                isError = submitAttempted && holderInvalid
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -106,7 +122,13 @@ fun WithdrawalRequestScreen(
                 label = { Text("Account Number") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                isError = (accountNumber.isNotEmpty() && accountInvalid) || (submitAttempted && accountInvalid),
+                supportingText = {
+                    if ((accountNumber.isNotEmpty() && accountInvalid) || (submitAttempted && accountInvalid)) {
+                        Text(if (accountNumber.isBlank()) "Account number is required" else "Enter digits only", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -117,19 +139,25 @@ fun WithdrawalRequestScreen(
                 label = { Text("Branch Code") },
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                isError = (branchCode.isNotEmpty() && branchInvalid) || (submitAttempted && branchInvalid),
+                supportingText = {
+                    if ((branchCode.isNotEmpty() && branchInvalid) || (submitAttempted && branchInvalid)) {
+                        Text(if (branchCode.isBlank()) "Branch code is required" else "Enter digits only", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(40.dp))
 
             Button(
-                onClick = { 
-                    val amt = amount.toDoubleOrNull() ?: 0.0
-                    onWithdrawClick(amt, bankName, accountHolder, accountNumber, branchCode) 
+                onClick = {
+                    submitAttempted = true
+                    if (formValid) onWithdrawClick(amountValue!!, bankName, accountHolder, accountNumber, branchCode)
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                enabled = !isLoading && amount.isNotEmpty() && bankName.isNotEmpty() && accountNumber.isNotEmpty()
+                enabled = !isLoading
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)

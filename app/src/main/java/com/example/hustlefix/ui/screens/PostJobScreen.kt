@@ -32,10 +32,18 @@ fun PostJobScreen(
     var location by remember { mutableStateOf("") }
     var deadline by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
+    var submitAttempted by remember { mutableStateOf(false) }
     
     val scrollState = rememberScrollState()
     val categories = listOf("Plumbing", "Electrical", "Cleaning", "Painting", "Carpentry", "Gardening", "Moving", "Other")
     var expanded by remember { mutableStateOf(false) }
+    val amountValue = amount.toDoubleOrNull()
+    val titleInvalid = title.isBlank()
+    val categoryInvalid = category !in categories
+    val descriptionInvalid = description.isBlank()
+    val amountInvalid = amountValue == null || !amountValue.isFinite() || amountValue <= 0.0
+    val locationInvalid = location.isBlank()
+    val formValid = !titleInvalid && !categoryInvalid && !descriptionInvalid && !amountInvalid && !locationInvalid
 
     Scaffold(
         topBar = {
@@ -59,6 +67,7 @@ fun PostJobScreen(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
+                isError = submitAttempted && titleInvalid,
                 label = { Text("Job Title") },
                 placeholder = { Text("e.g. Fix leaking kitchen tap") },
                 modifier = Modifier.fillMaxWidth(),
@@ -77,6 +86,7 @@ fun PostJobScreen(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Category") },
+                    isError = submitAttempted && categoryInvalid,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier.menuAnchor().fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
@@ -106,7 +116,8 @@ fun PostJobScreen(
                 placeholder = { Text("e.g. 123 Main St, Cape Town") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) }
+                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                isError = submitAttempted && locationInvalid
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -118,7 +129,13 @@ fun PostJobScreen(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 shape = RoundedCornerShape(16.dp),
-                prefix = { Text("R ") }
+                prefix = { Text("R ") },
+                isError = (amount.isNotEmpty() && amountInvalid) || (submitAttempted && amountInvalid),
+                supportingText = {
+                    if ((amount.isNotEmpty() && amountInvalid) || (submitAttempted && amountInvalid)) {
+                        Text("Enter an amount greater than zero", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -187,18 +204,21 @@ fun PostJobScreen(
                 placeholder = { Text("Describe what needs to be done...") },
                 modifier = Modifier.fillMaxWidth().height(150.dp),
                 shape = RoundedCornerShape(16.dp),
-                maxLines = 10
+                maxLines = 10,
+                label = { Text("Description") },
+                isError = submitAttempted && descriptionInvalid
             )
 
             Spacer(modifier = Modifier.height(40.dp))
 
             Button(
-                onClick = { 
-                    onPostClick(title, category, description, amount.toDoubleOrNull() ?: 0.0, location, deadline.ifEmpty { null }) 
+                onClick = {
+                    submitAttempted = true
+                    if (formValid) onPostClick(title, category, description, amountValue!!, location, deadline.ifEmpty { null })
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                enabled = !isLoading && title.isNotEmpty() && amount.isNotEmpty() && location.isNotEmpty()
+                enabled = !isLoading
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)

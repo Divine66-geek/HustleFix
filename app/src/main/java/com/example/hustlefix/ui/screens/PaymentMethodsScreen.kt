@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.hustlefix.ui.viewmodels.PaymentMethod
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -146,6 +147,19 @@ fun AddPaymentDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) 
     var cardNum by remember { mutableStateOf("") }
     var expiry by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("Visa") }
+    var submitAttempted by remember { mutableStateOf(false) }
+    val cardInvalid = cardNum.length !in 12..16 || !cardNum.all(Char::isDigit)
+    val expiryParts = expiry.split("/")
+    val expiryMonth = expiryParts.firstOrNull()?.toIntOrNull()
+    val expiryYear = expiryParts.getOrNull(1)?.toIntOrNull()
+    val now = Calendar.getInstance()
+    val currentYear = now.get(Calendar.YEAR) % 100
+    val currentMonth = now.get(Calendar.MONTH) + 1
+    val expiryInvalid = !Regex("(0[1-9]|1[0-2])/[0-9]{2}").matches(expiry) ||
+            expiryMonth == null || expiryYear == null ||
+            expiryYear < currentYear || (expiryYear == currentYear && expiryMonth < currentMonth)
+    val typeInvalid = type.isBlank()
+    val formValid = !cardInvalid && !expiryInvalid && !typeInvalid
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -158,7 +172,13 @@ fun AddPaymentDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) 
                     label = { Text("Card Number") },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    isError = (cardNum.isNotEmpty() && cardInvalid) || (submitAttempted && cardInvalid),
+                    supportingText = {
+                        if ((cardNum.isNotEmpty() && cardInvalid) || (submitAttempted && cardInvalid)) {
+                            Text(if (cardNum.isEmpty()) "Card number is required" else "Enter 12–16 digits", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -166,20 +186,30 @@ fun AddPaymentDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) 
                         onValueChange = { if (it.length <= 5) expiry = it },
                         label = { Text("MM/YY") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        isError = (expiry.isNotEmpty() && expiryInvalid) || (submitAttempted && expiryInvalid),
+                        supportingText = {
+                            if ((expiry.isNotEmpty() && expiryInvalid) || (submitAttempted && expiryInvalid)) {
+                                Text(if (expiry.isEmpty()) "Expiry is required" else "Use MM/YY", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     )
                     OutlinedTextField(
                         value = type,
                         onValueChange = { type = it },
                         label = { Text("Card Type") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        isError = submitAttempted && typeInvalid
                     )
                 }
             }
         },
         confirmButton = {
-            Button(onClick = { onConfirm(type, cardNum, expiry) }, enabled = cardNum.length >= 12) {
+            Button(onClick = {
+                submitAttempted = true
+                if (formValid) onConfirm(type, cardNum, expiry)
+            }) {
                 Text("ADD CARD")
             }
         },

@@ -48,6 +48,7 @@ fun EditServiceScreen(
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var remoteImageUrl by remember { mutableStateOf<String?>(null) }
     var isImageDeleted by remember { mutableStateOf(false) }
+    var submitAttempted by remember { mutableStateOf(false) }
     
     LaunchedEffect(service) {
         service?.let {
@@ -65,6 +66,13 @@ fun EditServiceScreen(
     val rateTypes = listOf("Fixed", "Hourly", "Call-Out Fee")
     var expanded by remember { mutableStateOf(false) }
     var rateTypeExpanded by remember { mutableStateOf(false) }
+    val priceValue = price.toDoubleOrNull()
+    val titleInvalid = title.isBlank()
+    val categoryInvalid = category !in categories
+    val rateTypeInvalid = rateType !in rateTypes
+    val priceInvalid = priceValue == null || !priceValue.isFinite() || priceValue <= 0.0
+    val descriptionInvalid = description.isBlank()
+    val formValid = !titleInvalid && !categoryInvalid && !rateTypeInvalid && !priceInvalid && !descriptionInvalid
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -151,7 +159,8 @@ fun EditServiceScreen(
                     onValueChange = { title = it },
                     label = { Text("Service Title") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    isError = submitAttempted && titleInvalid
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -166,6 +175,7 @@ fun EditServiceScreen(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Category") },
+                        isError = submitAttempted && categoryInvalid,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp)
@@ -198,6 +208,7 @@ fun EditServiceScreen(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Rate Type") },
+                        isError = submitAttempted && rateTypeInvalid,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = rateTypeExpanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp)
@@ -227,7 +238,13 @@ fun EditServiceScreen(
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     shape = RoundedCornerShape(16.dp),
-                    prefix = { Text("R ") }
+                    prefix = { Text("R ") },
+                    isError = (price.isNotEmpty() && priceInvalid) || (submitAttempted && priceInvalid),
+                    supportingText = {
+                        if ((price.isNotEmpty() && priceInvalid) || (submitAttempted && priceInvalid)) {
+                            Text("Enter a rate greater than zero", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -238,18 +255,20 @@ fun EditServiceScreen(
                     label = { Text("Description") },
                     modifier = Modifier.fillMaxWidth().height(150.dp),
                     shape = RoundedCornerShape(16.dp),
-                    maxLines = 10
+                    maxLines = 10,
+                    isError = submitAttempted && descriptionInvalid
                 )
 
                 Spacer(modifier = Modifier.height(40.dp))
 
                 Button(
-                    onClick = { 
-                        onSaveClick(title, description, category, rateType, price.toDoubleOrNull() ?: 0.0, selectedImageUri, isImageDeleted) 
+                    onClick = {
+                        submitAttempted = true
+                        if (formValid) onSaveClick(title, description, category, rateType, priceValue!!, selectedImageUri, isImageDeleted)
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(16.dp),
-                    enabled = !isLoading && title.isNotEmpty() && price.isNotEmpty()
+                    enabled = !isLoading
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)

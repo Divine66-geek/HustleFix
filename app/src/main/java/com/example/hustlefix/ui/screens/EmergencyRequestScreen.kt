@@ -51,6 +51,10 @@ fun EmergencyRequestScreen(
     var selectedUrgency by remember { mutableStateOf("ASAP") }
     var description by remember { mutableStateOf("") }
     var confirmed by remember { mutableStateOf(false) }
+    var submitAttempted by remember { mutableStateOf(false) }
+    val descriptionInvalid = description.isBlank()
+    val urgencyInvalid = selectedUrgency !in listOf("ASAP", "Today", "Flexible")
+    val formValid = !descriptionInvalid && !urgencyInvalid && confirmed
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -161,7 +165,8 @@ fun EmergencyRequestScreen(
                     label = { Text(stringResource(R.string.work_description_label)) },
                     placeholder = { Text(stringResource(R.string.work_description_placeholder)) },
                     modifier = Modifier.fillMaxWidth().height(120.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    isError = submitAttempted && descriptionInvalid
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -185,18 +190,29 @@ fun EmergencyRequestScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
-                    Text(stringResource(R.string.confirm_urgent), style = MaterialTheme.typography.bodySmall)
+                    Checkbox(
+                        checked = confirmed,
+                        onCheckedChange = { confirmed = it },
+                        colors = CheckboxDefaults.colors(uncheckedColor = if (submitAttempted && !confirmed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    )
+                    Text(
+                        stringResource(R.string.confirm_urgent),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (submitAttempted && !confirmed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
-                    onClick = { onSendEmergency(selectedUrgency, description) },
+                    onClick = {
+                        submitAttempted = true
+                        if (formValid) onSendEmergency(selectedUrgency, description)
+                    },
                     modifier = Modifier.fillMaxWidth().height(64.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    enabled = !isLoading && confirmed && description.isNotEmpty()
+                    enabled = !isLoading
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))

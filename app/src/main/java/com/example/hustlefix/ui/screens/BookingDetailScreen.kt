@@ -86,11 +86,19 @@ fun BookingDetailScreen(
     var quoteMessage by remember { mutableStateOf("") }
     var disputeReason by remember { mutableStateOf("") }
     var inputCode by remember { mutableStateOf("") }
+    var quoteSubmitAttempted by remember { mutableStateOf(false) }
+    var disputeSubmitAttempted by remember { mutableStateOf(false) }
+    var completionSubmitAttempted by remember { mutableStateOf(false) }
+    val quoteAmountValue = quoteAmount.toDoubleOrNull()
+    val quoteAmountInvalid = quoteAmountValue == null || !quoteAmountValue.isFinite() || quoteAmountValue <= 0.0
+    val quoteMessageInvalid = quoteMessage.isBlank()
+    val disputeReasonInvalid = disputeReason.isBlank()
+    val completionCodeInvalid = inputCode.length != 4 || !inputCode.all(Char::isDigit)
     var pendingStatusUpdate by remember { mutableStateOf<String?>(null) }
 
     if (showQuoteDialog) {
         AlertDialog(
-            onDismissRequest = { showQuoteDialog = false },
+            onDismissRequest = { showQuoteDialog = false; quoteSubmitAttempted = false },
             title = { Text("Submit On-Site Quote", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
@@ -103,7 +111,13 @@ fun BookingDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         shape = RoundedCornerShape(12.dp),
-                        prefix = { Text("R ") }
+                        prefix = { Text("R ") },
+                        isError = (quoteAmount.isNotEmpty() && quoteAmountInvalid) || (quoteSubmitAttempted && quoteAmountInvalid),
+                        supportingText = {
+                            if ((quoteAmount.isNotEmpty() && quoteAmountInvalid) || (quoteSubmitAttempted && quoteAmountInvalid)) {
+                                Text("Enter an amount greater than zero", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
@@ -111,33 +125,33 @@ fun BookingDetailScreen(
                         onValueChange = { quoteMessage = it },
                         label = { Text("Breakdown (e.g. Parts R500, Labor R800)") },
                         modifier = Modifier.fillMaxWidth().height(120.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        isError = quoteSubmitAttempted && quoteMessageInvalid
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val amt = quoteAmount.toDoubleOrNull() ?: 0.0
-                        if (amt > 0) {
-                            onSubmitQuote(amt, quoteMessage)
+                        quoteSubmitAttempted = true
+                        if (!quoteAmountInvalid && !quoteMessageInvalid) {
+                            onSubmitQuote(quoteAmountValue!!, quoteMessage)
                             showQuoteDialog = false
                         }
                     },
-                    enabled = quoteAmount.isNotBlank() && quoteMessage.isNotBlank()
                 ) {
                     Text("SUBMIT QUOTE")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showQuoteDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showQuoteDialog = false; quoteSubmitAttempted = false }) { Text("Cancel") }
             }
         )
     }
 
     if (showDisputeDialog) {
         AlertDialog(
-            onDismissRequest = { showDisputeDialog = false },
+            onDismissRequest = { showDisputeDialog = false; disputeSubmitAttempted = false },
             title = { Text(stringResource(R.string.report_problem), fontWeight = FontWeight.Bold) },
             text = {
                 Column {
@@ -148,23 +162,26 @@ fun BookingDetailScreen(
                         onValueChange = { disputeReason = it },
                         label = { Text(stringResource(R.string.issue_details)) },
                         modifier = Modifier.fillMaxWidth().height(120.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        isError = disputeSubmitAttempted && disputeReasonInvalid
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = { 
-                        onDisputeSubmit(disputeReason)
-                        showDisputeDialog = false 
+                        disputeSubmitAttempted = true
+                        if (!disputeReasonInvalid) {
+                            onDisputeSubmit(disputeReason)
+                            showDisputeDialog = false
+                        }
                     },
-                    enabled = disputeReason.isNotBlank()
                 ) {
                     Text(stringResource(R.string.submit_to_admin))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDisputeDialog = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { showDisputeDialog = false; disputeSubmitAttempted = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -178,7 +195,7 @@ fun BookingDetailScreen(
     
     if (showCompletionCodeDialog) {
         AlertDialog(
-            onDismissRequest = { showCompletionCodeDialog = false },
+            onDismissRequest = { showCompletionCodeDialog = false; completionSubmitAttempted = false },
             title = { Text(stringResource(R.string.complete_job), fontWeight = FontWeight.Bold) },
             text = {
                 Column {
@@ -186,27 +203,35 @@ fun BookingDetailScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedTextField(
                         value = inputCode,
-                        onValueChange = { if (it.length <= 4) inputCode = it },
+                        onValueChange = { if (it.length <= 4 && it.all(Char::isDigit)) inputCode = it },
                         label = { Text(stringResource(R.string.job_completion_code)) },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
+                        singleLine = true,
+                        isError = completionSubmitAttempted && completionCodeInvalid,
+                        supportingText = {
+                            if (completionSubmitAttempted && completionCodeInvalid) {
+                                Text("Enter the 4-digit completion code", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = { 
-                        onStatusUpdate("completed", inputCode)
-                        showCompletionCodeDialog = false 
+                        completionSubmitAttempted = true
+                        if (!completionCodeInvalid) {
+                            onStatusUpdate("completed", inputCode)
+                            showCompletionCodeDialog = false
+                        }
                     },
-                    enabled = inputCode.length == 4
                 ) {
                     Text(stringResource(R.string.mark_as_completed))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCompletionCodeDialog = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { showCompletionCodeDialog = false; completionSubmitAttempted = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -584,7 +609,7 @@ fun BookingDetailScreen(
                                     if (booking.paymentStatus == "PAID") {
                                         if (quote == null || quote.status == "pending") {
                                             Button(
-                                                onClick = { showQuoteDialog = true },
+                                                onClick = { showQuoteDialog = true; quoteSubmitAttempted = false },
                                                 modifier = Modifier.fillMaxWidth().height(56.dp),
                                                 shape = RoundedCornerShape(16.dp),
                                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
@@ -622,7 +647,7 @@ fun BookingDetailScreen(
                                     if (booking.paymentStatus == "PAID") {
                                         if (booking.status == "in_progress") {
                                             OutlinedButton(
-                                                onClick = { showCompletionCodeDialog = true },
+                                                onClick = { showCompletionCodeDialog = true; completionSubmitAttempted = false },
                                                 modifier = Modifier.fillMaxWidth().height(56.dp),
                                                 shape = RoundedCornerShape(16.dp)
                                             ) {
@@ -709,7 +734,7 @@ fun BookingDetailScreen(
 
                                 Spacer(modifier = Modifier.height(24.dp))
                                 TextButton(
-                                    onClick = { showDisputeDialog = true },
+                                    onClick = { showDisputeDialog = true; disputeSubmitAttempted = false },
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                                 ) {

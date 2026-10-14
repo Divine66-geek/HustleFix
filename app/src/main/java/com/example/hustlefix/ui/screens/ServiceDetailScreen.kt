@@ -58,6 +58,7 @@ fun ServiceDetailScreen(
         var dateText by remember { mutableStateOf("") }
         var showDatePicker by remember { mutableStateOf(false) }
         var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+        var submitAttempted by remember { mutableStateOf(false) }
 
         if (showDatePicker) {
             com.example.hustlefix.ui.components.HustleFixDatePicker(
@@ -86,6 +87,7 @@ fun ServiceDetailScreen(
                         placeholder = { Text("Select a date") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
+                        isError = submitAttempted && dateText.isBlank(),
                         trailingIcon = {
                             IconButton(onClick = { showDatePicker = true }) {
                                 Icon(Icons.Default.CalendarToday, contentDescription = "Select Date")
@@ -93,7 +95,10 @@ fun ServiceDetailScreen(
                         },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            errorBorderColor = MaterialTheme.colorScheme.error,
+                            errorLabelColor = MaterialTheme.colorScheme.error,
+                            errorTrailingIconColor = MaterialTheme.colorScheme.error
                         ),
                         interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                             .also { interactionSource ->
@@ -118,11 +123,13 @@ fun ServiceDetailScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = { 
-                        onBookNowClick(dateText, notes)
-                        showBookingDialog = false 
+                    onClick = {
+                        submitAttempted = true
+                        if (dateText.isNotBlank()) {
+                            onBookNowClick(dateText, notes)
+                            showBookingDialog = false
+                        }
                     },
-                    enabled = dateText.isNotEmpty()
                 ) {
                     Text("CONFIRM BOOKING")
                 }

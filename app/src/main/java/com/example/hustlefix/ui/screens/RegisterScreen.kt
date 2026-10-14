@@ -41,16 +41,16 @@ fun RegisterScreen(
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var submitAttempted by remember { mutableStateOf(false) }
 
     // Real-time validation states
-    val isEmailValid = email.isEmpty() || Patterns.EMAIL_ADDRESS.matcher(email).matches()
-    val isPhoneValid = phone.isEmpty() || (phone.length >= 10 && phone.all { it.isDigit() })
-    val isPasswordValid = password.isEmpty() || password.length >= 6
-    val isConfirmPasswordValid = confirmPassword.isEmpty() || confirmPassword == password
-    val isFormValid = fullName.isNotBlank() && email.isNotBlank() && isEmailValid && 
-                      phone.isNotBlank() && isPhoneValid && 
-                      password.isNotBlank() && isPasswordValid && 
-                      confirmPassword == password
+    val isEmailValid = Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val isPhoneValid = phone.length >= 10 && phone.all { it.isDigit() }
+    val isPasswordValid = password.length >= 6
+    val isConfirmPasswordValid = confirmPassword.isNotEmpty() && confirmPassword == password
+    val isFormValid = fullName.isNotBlank() && email.isNotBlank() && isEmailValid &&
+                      phone.isNotBlank() && isPhoneValid &&
+                      password.isNotBlank() && isPasswordValid && isConfirmPasswordValid
 
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -107,13 +107,17 @@ fun RegisterScreen(
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = { fullName = it },
+                    isError = submitAttempted && fullName.isBlank(),
                     label = { Text("Full Name") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        errorBorderColor = MaterialTheme.colorScheme.error,
+                        errorLabelColor = MaterialTheme.colorScheme.error,
+                        errorLeadingIconColor = MaterialTheme.colorScheme.error
                     )
                 )
 
@@ -126,16 +130,19 @@ fun RegisterScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-                    isError = !isEmailValid && email.isNotEmpty(),
+                    isError = (submitAttempted && email.isBlank()) || (email.isNotEmpty() && !isEmailValid),
                     supportingText = {
-                        if (!isEmailValid && email.isNotEmpty()) {
-                            Text("Invalid email format", color = MaterialTheme.colorScheme.error)
+                        if ((submitAttempted && email.isBlank()) || (email.isNotEmpty() && !isEmailValid)) {
+                            Text(if (email.isBlank()) "Email is required" else "Invalid email format", color = MaterialTheme.colorScheme.error)
                         }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        errorBorderColor = MaterialTheme.colorScheme.error,
+                        errorLabelColor = MaterialTheme.colorScheme.error,
+                        errorLeadingIconColor = MaterialTheme.colorScheme.error
                     )
                 )
 
@@ -148,16 +155,19 @@ fun RegisterScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                    isError = !isPhoneValid && phone.isNotEmpty(),
+                    isError = (submitAttempted && phone.isBlank()) || (phone.isNotEmpty() && !isPhoneValid),
                     supportingText = {
-                        if (!isPhoneValid && phone.isNotEmpty()) {
-                            Text("Enter a valid 10-digit number", color = MaterialTheme.colorScheme.error)
+                        if ((submitAttempted && phone.isBlank()) || (phone.isNotEmpty() && !isPhoneValid)) {
+                            Text(if (phone.isBlank()) "Phone number is required" else "Enter a valid 10-digit number", color = MaterialTheme.colorScheme.error)
                         }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        errorBorderColor = MaterialTheme.colorScheme.error,
+                        errorLabelColor = MaterialTheme.colorScheme.error,
+                        errorLeadingIconColor = MaterialTheme.colorScheme.error
                     )
                 )
 
@@ -170,17 +180,20 @@ fun RegisterScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    isError = !isPasswordValid && password.isNotEmpty(),
+                    isError = (submitAttempted && password.isBlank()) || (password.isNotEmpty() && !isPasswordValid),
                     supportingText = {
-                        if (!isPasswordValid && password.isNotEmpty()) {
-                            Text("Minimum 6 characters required", color = MaterialTheme.colorScheme.error)
+                        if ((submitAttempted && password.isBlank()) || (password.isNotEmpty() && !isPasswordValid)) {
+                            Text(if (password.isBlank()) "Password is required" else "Minimum 6 characters required", color = MaterialTheme.colorScheme.error)
                         }
                     },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        errorBorderColor = MaterialTheme.colorScheme.error,
+                        errorLabelColor = MaterialTheme.colorScheme.error,
+                        errorLeadingIconColor = MaterialTheme.colorScheme.error
                     )
                 )
 
@@ -193,17 +206,20 @@ fun RegisterScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                    isError = !isConfirmPasswordValid && confirmPassword.isNotEmpty(),
+                    isError = (submitAttempted && confirmPassword.isBlank()) || (confirmPassword.isNotEmpty() && !isConfirmPasswordValid),
                     supportingText = {
-                        if (!isConfirmPasswordValid && confirmPassword.isNotEmpty()) {
-                            Text("Passwords do not match", color = MaterialTheme.colorScheme.error)
+                        if ((submitAttempted && confirmPassword.isBlank()) || (confirmPassword.isNotEmpty() && !isConfirmPasswordValid)) {
+                            Text(if (confirmPassword.isBlank()) "Please confirm your password" else "Passwords do not match", color = MaterialTheme.colorScheme.error)
                         }
                     },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        errorBorderColor = MaterialTheme.colorScheme.error,
+                        errorLabelColor = MaterialTheme.colorScheme.error,
+                        errorLeadingIconColor = MaterialTheme.colorScheme.error
                     )
                 )
 
@@ -212,13 +228,14 @@ fun RegisterScreen(
                 Button(
                     onClick = { 
                         com.example.hustlefix.util.SoundHelper.playClick(context)
-                        onRegisterClick(fullName, email, phone, password) 
+                        submitAttempted = true
+                        if (isFormValid) onRegisterClick(fullName, email, phone, password)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(60.dp),
                     shape = RoundedCornerShape(20.dp),
-                    enabled = !isLoading && isFormValid,
+                    enabled = !isLoading,
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                 ) {
                     if (isLoading) {

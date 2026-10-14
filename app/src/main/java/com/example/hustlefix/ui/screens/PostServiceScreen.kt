@@ -42,12 +42,20 @@ fun PostServiceScreen(
     var rateType by remember { mutableStateOf("Fixed") }
     var price by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var submitAttempted by remember { mutableStateOf(false) }
     
     val scrollState = rememberScrollState()
     val categories = listOf("Plumbing", "Electrical", "Cleaning", "Painting", "Carpentry", "Gardening", "Moving", "Other")
     val rateTypes = listOf("Fixed", "Hourly", "Call-Out Fee")
     var expanded by remember { mutableStateOf(false) }
     var rateTypeExpanded by remember { mutableStateOf(false) }
+    val priceValue = price.toDoubleOrNull()
+    val titleInvalid = title.isBlank()
+    val categoryInvalid = category !in categories
+    val rateTypeInvalid = rateType !in rateTypes
+    val priceInvalid = priceValue == null || !priceValue.isFinite() || priceValue <= 0.0
+    val descriptionInvalid = description.isBlank()
+    val formValid = !titleInvalid && !categoryInvalid && !rateTypeInvalid && !priceInvalid && !descriptionInvalid
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -113,7 +121,8 @@ fun PostServiceScreen(
                 label = { Text("Service Title") },
                 placeholder = { Text("e.g. Professional Home Cleaning") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                isError = submitAttempted && titleInvalid
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -128,6 +137,7 @@ fun PostServiceScreen(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Category") },
+                    isError = submitAttempted && categoryInvalid,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier.menuAnchor().fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
@@ -160,6 +170,7 @@ fun PostServiceScreen(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Rate Type") },
+                    isError = submitAttempted && rateTypeInvalid,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = rateTypeExpanded) },
                     modifier = Modifier.menuAnchor().fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp)
@@ -189,7 +200,13 @@ fun PostServiceScreen(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 shape = RoundedCornerShape(16.dp),
-                prefix = { Text("R ") }
+                prefix = { Text("R ") },
+                isError = (price.isNotEmpty() && priceInvalid) || (submitAttempted && priceInvalid),
+                supportingText = {
+                    if ((price.isNotEmpty() && priceInvalid) || (submitAttempted && priceInvalid)) {
+                        Text("Enter a rate greater than zero", color = MaterialTheme.colorScheme.error)
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -200,18 +217,20 @@ fun PostServiceScreen(
                 label = { Text("Description") },
                 modifier = Modifier.fillMaxWidth().height(150.dp),
                 shape = RoundedCornerShape(16.dp),
-                maxLines = 10
+                maxLines = 10,
+                isError = submitAttempted && descriptionInvalid
             )
 
             Spacer(modifier = Modifier.height(40.dp))
 
             Button(
-                onClick = { 
-                    onPostClick(title, description, category, rateType, price.toDoubleOrNull() ?: 0.0, selectedImageUri) 
+                onClick = {
+                    submitAttempted = true
+                    if (formValid) onPostClick(title, description, category, rateType, priceValue!!, selectedImageUri)
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                enabled = !isLoading && title.isNotEmpty() && price.isNotEmpty()
+                enabled = !isLoading
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)

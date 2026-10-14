@@ -24,6 +24,7 @@ public class Booking {
     private String paymentMethod;
     private Double rating;
     private Boolean feeCredited;
+    private String proofOfWorkImageUrl;
 
     public Booking() {
         // Default constructor for Firebase
@@ -86,7 +87,9 @@ public class Booking {
     public void setCompletionCode(String code) { this.completionCode = code; }
     public void setRating(Double rating) { this.rating = rating; }
     public Boolean getFeeCredited() { return feeCredited != null ? feeCredited : false; }
+    public String getProofOfWorkImageUrl() { return proofOfWorkImageUrl; }
     public void setFeeCredited(Boolean feeCredited) { this.feeCredited = feeCredited; }
+    public void setProofOfWorkImageUrl(String proofOfWorkImageUrl) { this.proofOfWorkImageUrl = proofOfWorkImageUrl; }
 
     @Exclude
     public Double getPrice() { return getAmount(); }

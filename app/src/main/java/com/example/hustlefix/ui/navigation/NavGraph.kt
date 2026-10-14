@@ -1042,6 +1042,8 @@ fun HustleFixNavGraph(
                 isLoading = uiState.isLoading,
                 isVerifyingPayment = uiState.isVerifyingPayment,
                 walletBalance = uiState.walletBalance,
+                isUploadingProof = uiState.isUploadingProof,
+                onProofImageSelected = { viewModel.uploadProofOfWorkImage(it) },
                 error = uiState.error,
                 isUpdateSuccess = uiState.isUpdateSuccess,
                 onClearError = { viewModel.clearStatus() },

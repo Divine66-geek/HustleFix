@@ -1,8 +1,12 @@
 package com.example.hustlefix.ui.viewmodels
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
 import com.example.hustlefix.Booking
 import com.example.hustlefix.Quote
 import com.example.hustlefix.Rating
@@ -26,6 +30,7 @@ data class BookingDetailUiState(
     val isServiceProvider: Boolean = false,
     val isLoading: Boolean = false,
     val isVerifyingPayment: Boolean = false,
+    val isUploadingProof: Boolean = false,
     val error: String? = null,
     val isUpdateSuccess: Boolean = false
 )
@@ -429,6 +434,56 @@ class BookingDetailViewModel(
                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message)
             }
         }
+    }
+
+    fun uploadProofOfWorkImage(uri: Uri) {
+        val booking = _uiState.value.booking
+        val currentUserId = auth.currentUser?.uid
+        if (booking == null || currentUserId == null || currentUserId != booking.workerId || booking.status != "completed") {
+            _uiState.value = _uiState.value.copy(error = "Only the assigned provider can add proof to a completed booking")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isUploadingProof = true, error = null)
+        MediaManager.get().upload(uri)
+            .unsigned("hustle_fix")
+            .callback(object : UploadCallback {
+                override fun onStart(requestId: String?) {}
+                override fun onProgress(requestId: String?, bytes: Long, totalBytes: Long) {}
+                override fun onSuccess(requestId: String?, resultData: Map<*, *>?) {
+                    val imageUrl = resultData?.get("secure_url") as? String
+                    if (imageUrl.isNullOrBlank()) {
+                        _uiState.value = _uiState.value.copy(
+                            isUploadingProof = false,
+                            error = "Image upload completed without returning an image URL"
+                        )
+                        return
+                    }
+                    database.getReference("bookings").child(booking.bookingId)
+                        .child("proofOfWorkImageUrl")
+                        .setValue(imageUrl)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                _uiState.value = _uiState.value.copy(isUploadingProof = false, isUpdateSuccess = true)
+                            } else {
+                                _uiState.value = _uiState.value.copy(
+                                    isUploadingProof = false,
+                                    error = task.exception?.message ?: "Failed to save proof image to booking"
+                                )
+                            }
+                        }
+                }
+
+                override fun onError(requestId: String?, error: ErrorInfo?) {
+                    _uiState.value = _uiState.value.copy(
+                        isUploadingProof = false,
+                        error = error?.description ?: "Failed to upload proof image"
+                    )
+                }
+
+                override fun onReschedule(requestId: String?, error: ErrorInfo?) {}
+            })
+            .dispatch()
     }
 
     fun submitRating(score: Float, comment: String, isAnonymous: Boolean) {

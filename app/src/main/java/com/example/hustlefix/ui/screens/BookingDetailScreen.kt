@@ -1,5 +1,9 @@
 package com.example.hustlefix.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -63,6 +67,8 @@ fun BookingDetailScreen(
     onDisputeSubmit: (String) -> Unit = {},
     isVerifyingPayment: Boolean = false,
     walletBalance: Double = 0.0,
+    isUploadingProof: Boolean = false,
+    onProofImageSelected: (Uri) -> Unit = {},
     onClearError: () -> Unit = {},
     error: String? = null,
     isUpdateSuccess: Boolean = false,
@@ -71,6 +77,10 @@ fun BookingDetailScreen(
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val proofImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> uri?.let(onProofImageSelected) }
+    )
 
     LaunchedEffect(isUpdateSuccess) {
         if (isUpdateSuccess) {
@@ -515,6 +525,79 @@ fun BookingDetailScreen(
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text("QUOTE PAID & SETTLED", fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
                                         }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (booking.status == "completed") {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        StandardCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    stringResource(R.string.proof_of_work),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    if (isServiceProvider) {
+                                        stringResource(R.string.proof_of_work_optional_provider)
+                                    } else {
+                                        stringResource(R.string.proof_of_work_optional_client)
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+
+                                val proofImageUrl = booking.proofOfWorkImageUrl
+                                if (!proofImageUrl.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(proofImageUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = stringResource(R.string.proof_of_work),
+                                        modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else if (!isServiceProvider) {
+                                    Text(
+                                        stringResource(R.string.no_proof_of_work),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.padding(top = 12.dp)
+                                    )
+                                }
+
+                                if (isServiceProvider) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            proofImagePicker.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        enabled = !isUploadingProof
+                                    ) {
+                                        if (isUploadingProof) {
+                                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                        } else {
+                                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            if (isUploadingProof) {
+                                                stringResource(R.string.uploading_proof_of_work)
+                                            } else if (proofImageUrl.isNullOrBlank()) {
+                                                stringResource(R.string.upload_proof_of_work)
+                                            } else {
+                                                stringResource(R.string.replace_proof_of_work)
+                                            }
+                                        )
                                     }
                                 }
                             }

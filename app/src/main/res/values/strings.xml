@@ -110,6 +110,13 @@
     <string name="send_pay_link">SEND PAY LINK</string>
     <string name="open_chat">OPEN CHAT</string>
     <string name="mark_as_completed">MARK AS COMPLETED</string>
+    <string name="proof_of_work">Proof of work</string>
+    <string name="proof_of_work_optional_provider">Optional: add an image of the completed service for the client.</string>
+    <string name="proof_of_work_optional_client">The provider may optionally share an image of the completed service.</string>
+    <string name="no_proof_of_work">No proof image was provided.</string>
+    <string name="upload_proof_of_work">Upload proof image</string>
+    <string name="replace_proof_of_work">Replace proof image</string>
+    <string name="uploading_proof_of_work">Uploading image…</string>
     <string name="awaiting_payment">Awaiting Client Payment...</string>
     <string name="pay_with_wallet">PAY WITH WALLET</string>
     <string name="pay_now">PAY NOW</string>
